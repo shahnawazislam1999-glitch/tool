@@ -474,19 +474,17 @@
             else compressImageBlob(fileData.blob, document.getElementById(`w-${id}`).value, document.getElementById(`h-${id}`).value, quality, onComplete);
         }
 
-        // MOBILE FIX: Add smart downscaling and robust memory cleanup for Android browsers
         function compressImageBlob(blob, targetW, targetH, quality, callback) {
             const img = new Image(); 
             const url = URL.createObjectURL(blob);
             
             img.onload = () => {
-                URL.revokeObjectURL(url); // Free memory immediately for mobile Chrome
+                URL.revokeObjectURL(url); 
 
                 let finalW = targetW ? parseInt(targetW) : img.naturalWidth;
                 let finalH = targetH ? parseInt(targetH) : img.naturalHeight;
 
-                // MOBILE SAFEGUARD: Prevent canvas Out-Of-Memory limits on high-res photos
-                const MAX_DIM = 3000; 
+                const MAX_DIM = window.innerWidth <= 768 ? 2048 : 4096;
                 if (!targetW && !targetH && (finalW > MAX_DIM || finalH > MAX_DIM)) {
                     const ratio = Math.min(MAX_DIM / finalW, MAX_DIM / finalH);
                     finalW = Math.round(finalW * ratio);
@@ -520,7 +518,6 @@
                 const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
                 const doc = new jsPDF('p', 'pt', 'a4', true); doc.deletePage(1); 
                 
-                // MOBILE FIX: Adaptive PDF scaling to prevent mobile canvas crashes
                 const isMobile = window.innerWidth <= 768;
                 const renderScale = isMobile ? 1.0 : 1.5;
 
@@ -546,7 +543,6 @@
             const mergeBtn = document.getElementById('btn-merge-pdfs'); mergeBtn.innerHTML = "Merging..."; mergeBtn.disabled = true;
             const { jsPDF } = window.jspdf; const doc = new jsPDF('p', 'pt', 'a4', true); doc.deletePage(1); 
 
-            // MOBILE FIX: Adaptive Scaling
             const isMobile = window.innerWidth <= 768;
             const renderScale = isMobile ? 1.0 : 1.5;
 
@@ -578,14 +574,14 @@
 
         function closeViewer() { document.getElementById('viewerModal').style.display = 'none'; document.getElementById('modalBody').innerHTML = ''; }
         
-        // MOBILE FIX: Added a delay before revoking URL so Android Download Manager can catch it
         function triggerBrowserDownload(blob, filename) {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a'); a.href = url; a.download = filename;
             document.body.appendChild(a); 
             a.click(); 
             document.body.removeChild(a); 
-            setTimeout(() => URL.revokeObjectURL(url), 500); // 500ms delay crucial for Android
+            // MOBILE FIX: Extended delay so Android Download Manager captures the file before it is deleted from memory
+            setTimeout(() => URL.revokeObjectURL(url), 1500); 
         }
 
         window.downloadFile = function(id) {
@@ -631,15 +627,49 @@
             localStorage.setItem('removeBgApiKey', key);
         }
 
+        function enableEditorButtons() {
+            document.getElementById('btnRemoveBg').disabled = false;
+            document.getElementById('btnApplyCrop').disabled = false;
+            document.getElementById('btnMakePhoto').disabled = false;
+        }
+
         function handleNewImage(event) {
             const file = event.target.files[0];
-            if (file) {
-                originalFilename = file.name.replace(/\.[^/.]+$/, "");
+            if (!file) return;
+            originalFilename = file.name.replace(/\.[^/.]+$/, "");
+
+            // MOBILE FIX: Pre-scale massive camera photos BEFORE putting them in the editor so the phone doesn't crash
+            if (window.innerWidth <= 768 && file.size > 2 * 1024 * 1024) { 
+                document.getElementById('cStatus').innerText = "Optimizing large image for mobile editing...";
+                const tempImg = new Image();
+                const tempUrl = URL.createObjectURL(file);
+                tempImg.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let w = tempImg.width;
+                    let h = tempImg.height;
+                    const MAX = 2048; 
+
+                    if (w > MAX || h > MAX) {
+                        const ratio = Math.min(MAX / w, MAX / h);
+                        w = Math.round(w * ratio);
+                        h = Math.round(h * ratio);
+                    }
+                    canvas.width = w; canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(tempImg, 0, 0, w, h);
+                    canvas.toBlob((blob) => {
+                        currentImageBlob = blob;
+                        initializeEditor();
+                        document.getElementById('cStatus').innerText = "Ready to edit!";
+                        enableEditorButtons();
+                    }, file.type, 0.9);
+                    URL.revokeObjectURL(tempUrl);
+                };
+                tempImg.src = tempUrl;
+            } else {
                 currentImageBlob = file;
                 initializeEditor();
-                document.getElementById('btnRemoveBg').disabled = false;
-                document.getElementById('btnApplyCrop').disabled = false;
-                document.getElementById('btnMakePhoto').disabled = false;
+                enableEditorButtons();
             }
         }
 
@@ -672,23 +702,28 @@
             const statusBox = document.getElementById('cStatus');
             statusBox.innerText = "Applying crop...";
             
-            // MOBILE FIX: Limit cropped canvas dimensions so mobile RAM doesn't overload
-            const croppedCanvas = cropper.getCroppedCanvas({
-                maxWidth: 3000,
-                maxHeight: 3000
-            });
-            
-            if (!croppedCanvas) return;
-
-            const mimeType = currentImageBlob && currentImageBlob.type ? currentImageBlob.type : 'image/png';
-
-            croppedCanvas.toBlob((blob) => {
-                if(blob) {
-                    currentImageBlob = blob; 
-                    initializeEditor();      
-                    statusBox.innerText = "Crop applied successfully!";
+            // Yield to UI so the text updates before processor freeze
+            setTimeout(() => {
+                const croppedCanvas = cropper.getCroppedCanvas({
+                    maxWidth: window.innerWidth <= 768 ? 2048 : 4096,
+                    maxHeight: window.innerWidth <= 768 ? 2048 : 4096
+                });
+                
+                if (!croppedCanvas) {
+                    statusBox.innerText = "Crop failed. Area might be too large.";
+                    return;
                 }
-            }, mimeType, 1.0);
+
+                const mimeType = currentImageBlob && currentImageBlob.type ? currentImageBlob.type : 'image/png';
+
+                croppedCanvas.toBlob((blob) => {
+                    if(blob) {
+                        currentImageBlob = blob; 
+                        initializeEditor();      
+                        statusBox.innerText = "Crop applied successfully!";
+                    }
+                }, mimeType, 1.0);
+            }, 50);
         }
 
         async function removeBackgroundAPI() {
@@ -749,84 +784,120 @@
             }
         }
 
+        // --- THE MAIN COMPRESSION ALGORITHM FOR MOBILE ---
         async function processCustomPhoto() {
             if (!cropper) return alert("Please select and crop a photo first.");
             
-            const targetW = parseInt(document.getElementById('cWidth').value);
-            const targetH = parseInt(document.getElementById('cHeight').value);
+            let targetW = parseInt(document.getElementById('cWidth').value);
+            let targetH = parseInt(document.getElementById('cHeight').value);
             const sizeInput = parseFloat(document.getElementById('cSize').value);
             const unit = document.getElementById('cUnit').value;
             const bgMode = document.getElementById('cBgColor').value;
 
             if (!targetW || !targetH) return alert("Please provide Final Width and Height.");
 
+            // MOBILE FIX: Prevent out of memory crash if user inputs crazy high numbers
+            const maxDeviceDim = window.innerWidth <= 768 ? 2048 : 4096;
+            if (targetW > maxDeviceDim || targetH > maxDeviceDim) {
+                alert(`Dimensions are too large for this device. Capping to ${maxDeviceDim}px to prevent a crash.`);
+                const ratio = Math.min(maxDeviceDim / targetW, maxDeviceDim / targetH);
+                targetW = Math.floor(targetW * ratio);
+                targetH = Math.floor(targetH * ratio);
+                document.getElementById('cWidth').value = targetW;
+                document.getElementById('cHeight').value = targetH;
+            }
+
             const btn = document.getElementById('btnMakePhoto');
             const statusBox = document.getElementById('cStatus');
             btn.disabled = true;
-            statusBox.innerText = "Generating Final Photo...";
+            statusBox.innerText = "Generating Final Photo... Please wait.";
 
-            // MOBILE FIX: Apply safe caps to the final export to prevent browser crash
-            const croppedCanvas = cropper.getCroppedCanvas({
-                maxWidth: 3000,
-                maxHeight: 3000
-            });
-            
-            const finalCanvas = document.createElement('canvas');
-            finalCanvas.width = targetW;
-            finalCanvas.height = targetH;
-            const ctx = finalCanvas.getContext('2d');
-            
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
+            // Yield to browser UI thread
+            await new Promise(r => setTimeout(r, 100));
 
-            if (bgMode === 'white') {
-                ctx.fillStyle = '#FFFFFF';
-                ctx.fillRect(0, 0, targetW, targetH);
-            } else if (bgMode === 'blue') {
-                ctx.fillStyle = '#007BFF'; 
-                ctx.fillRect(0, 0, targetW, targetH);
-            } else {
-                ctx.clearRect(0, 0, targetW, targetH);
-            }
-
-            ctx.drawImage(croppedCanvas, 0, 0, targetW, targetH);
-
-            const isTransparent = (bgMode === 'transparent');
-            const exportMime = isTransparent ? 'image/png' : 'image/jpeg';
-            const fileExt = isTransparent ? 'png' : 'jpg';
-            const targetBytes = sizeInput ? (sizeInput * (unit === 'MB' ? 1024 * 1024 : 1024)) : null;
-
-            if (isTransparent || !targetBytes) {
-                finalCanvas.toBlob((blob) => {
-                    statusBox.innerText = `Final Size: ${formatBytes(blob.size)} (${fileExt.toUpperCase()})`;
-                    triggerBrowserDownload(blob, `${originalFilename}_edited.${fileExt}`);
-                    btn.disabled = false;
-                }, exportMime, 0.95);
-                return;
-            }
-
-            statusBox.innerText = "Compressing to target size...";
-            let minQuality = 0.05;
-            let maxQuality = 1.0;
-            let bestBlob = null;
-
-            for (let i = 0; i < 8; i++) {
-                let midQuality = (minQuality + maxQuality) / 2;
-                let blob = await new Promise(res => finalCanvas.toBlob(res, 'image/jpeg', midQuality));
+            try {
+                const croppedCanvas = cropper.getCroppedCanvas({
+                    maxWidth: maxDeviceDim,
+                    maxHeight: maxDeviceDim,
+                    imageSmoothingEnabled: true,
+                    imageSmoothingQuality: 'medium'
+                });
                 
-                if (blob.size > targetBytes) {
-                    maxQuality = midQuality; 
+                if (!croppedCanvas) throw new Error("Failed to crop image.");
+
+                const finalCanvas = document.createElement('canvas');
+                finalCanvas.width = targetW;
+                finalCanvas.height = targetH;
+                const ctx = finalCanvas.getContext('2d');
+                
+                if (!ctx) throw new Error("Device does not have enough memory to process this size.");
+
+                if (bgMode === 'white') {
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fillRect(0, 0, targetW, targetH);
+                } else if (bgMode === 'blue') {
+                    ctx.fillStyle = '#007BFF'; 
+                    ctx.fillRect(0, 0, targetW, targetH);
                 } else {
-                    minQuality = midQuality; 
-                    bestBlob = blob;
+                    ctx.clearRect(0, 0, targetW, targetH);
                 }
+
+                ctx.drawImage(croppedCanvas, 0, 0, targetW, targetH);
+
+                const isTransparent = (bgMode === 'transparent');
+                const exportMime = isTransparent ? 'image/png' : 'image/jpeg';
+                const fileExt = isTransparent ? 'png' : 'jpg';
+                const targetBytes = sizeInput ? (sizeInput * (unit === 'MB' ? 1024 * 1024 : 1024)) : null;
+
+                if (isTransparent || !targetBytes) {
+                    finalCanvas.toBlob((blob) => {
+                        if (!blob) throw new Error("Could not process image.");
+                        statusBox.innerText = `Final Size: ${formatBytes(blob.size)} (${fileExt.toUpperCase()})`;
+                        triggerBrowserDownload(blob, `${originalFilename}_edited.${fileExt}`);
+                        btn.disabled = false;
+                    }, exportMime, 0.95);
+                    return;
+                }
+
+                statusBox.innerText = "Compressing to target size... (may take a moment)";
+                await new Promise(r => setTimeout(r, 100)); 
+
+                let minQuality = 0.05;
+                let maxQuality = 0.95;
+                let bestBlob = null;
+                
+                // MOBILE FIX: Fewer loops and forced timeouts to let Android RAM recover between generating images
+                let attempts = window.innerWidth <= 768 ? 4 : 8; 
+
+                for (let i = 0; i < attempts; i++) {
+                    let midQuality = (minQuality + maxQuality) / 2;
+                    let blob = await new Promise(res => finalCanvas.toBlob(res, 'image/jpeg', midQuality));
+                    
+                    if (!blob) break;
+
+                    if (blob.size > targetBytes) {
+                        maxQuality = midQuality; 
+                    } else {
+                        minQuality = midQuality; 
+                        bestBlob = blob;
+                    }
+                    // YIELD TO GARBAGE COLLECTOR
+                    await new Promise(r => setTimeout(r, 80));
+                }
+
+                if (!bestBlob) bestBlob = await new Promise(res => finalCanvas.toBlob(res, 'image/jpeg', 0.05));
+                if (!bestBlob) throw new Error("Compression completely failed.");
+
+                statusBox.innerText = `Final Size: ${formatBytes(bestBlob.size)} (JPG)`;
+                triggerBrowserDownload(bestBlob, `${originalFilename}_custom.jpg`);
+                
+            } catch (error) {
+                console.error("Processing Error:", error);
+                statusBox.innerText = "Error: " + error.message;
+                alert(error.message + "\nTry a slightly smaller resolution.");
+            } finally {
+                btn.disabled = false;
             }
-
-            if (!bestBlob) bestBlob = await new Promise(res => finalCanvas.toBlob(res, 'image/jpeg', 0.05));
-
-            statusBox.innerText = `Final Compressed Size: ${formatBytes(bestBlob.size)} (JPG)`;
-            triggerBrowserDownload(bestBlob, `${originalFilename}_custom.jpg`);
-            btn.disabled = false;
         }
     </script>
 </body>
