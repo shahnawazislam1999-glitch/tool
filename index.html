@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Local Document & Photo Vault</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -207,7 +207,6 @@
                     <summary style="cursor: pointer; font-weight: bold; color: var(--primary);">⚙️ Background Removal Setup (API)</summary>
                     <div style="margin-top: 8px; display: flex; flex-direction: column; gap: 8px; padding-top: 8px; border-top: 1px solid var(--border);">
                         <span>This tool uses the highly accurate <strong>Remove.bg API</strong> to ensure it works perfectly offline or locally.</span>
-                        <span>Get a free API key here: <a href="https://www.remove.bg/api" target="_blank" style="color: var(--primary);">remove.bg/api</a> (Gives 50 free requests/month).</span>
                         <div style="display: flex; gap: 10px; align-items: center;">
                             <input type="text" id="apiKeyInput" placeholder="Paste your API Key here (e.g., XyZ123...)" style="flex-grow: 1; padding: 8px; border-radius: 4px; border: 1px solid var(--border);" oninput="saveApiKey()">
                         </div>
@@ -475,14 +474,43 @@
             else compressImageBlob(fileData.blob, document.getElementById(`w-${id}`).value, document.getElementById(`h-${id}`).value, quality, onComplete);
         }
 
+        // MOBILE FIX: Add smart downscaling and robust memory cleanup for Android browsers
         function compressImageBlob(blob, targetW, targetH, quality, callback) {
-            const img = new Image(); img.src = URL.createObjectURL(blob);
+            const img = new Image(); 
+            const url = URL.createObjectURL(blob);
+            
             img.onload = () => {
+                URL.revokeObjectURL(url); // Free memory immediately for mobile Chrome
+
+                let finalW = targetW ? parseInt(targetW) : img.naturalWidth;
+                let finalH = targetH ? parseInt(targetH) : img.naturalHeight;
+
+                // MOBILE SAFEGUARD: Prevent canvas Out-Of-Memory limits on high-res photos
+                const MAX_DIM = 3000; 
+                if (!targetW && !targetH && (finalW > MAX_DIM || finalH > MAX_DIM)) {
+                    const ratio = Math.min(MAX_DIM / finalW, MAX_DIM / finalH);
+                    finalW = Math.round(finalW * ratio);
+                    finalH = Math.round(finalH * ratio);
+                }
+
                 const canvas = document.createElement('canvas');
-                canvas.width = targetW ? parseInt(targetW) : img.width; canvas.height = targetH ? parseInt(targetH) : img.height;
-                canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                canvas.width = finalW; 
+                canvas.height = finalH;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(img, 0, 0, finalW, finalH);
+                
                 canvas.toBlob((b) => callback(b), 'image/jpeg', quality); 
             };
+            
+            img.onerror = () => { 
+                URL.revokeObjectURL(url); 
+                alert("Error loading image for compression."); 
+            };
+            
+            img.src = url;
         }
 
         async function compressPDFBlob(blob, quality, callback) {
@@ -491,11 +519,22 @@
                 const arrayBuffer = await blob.arrayBuffer();
                 const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
                 const doc = new jsPDF('p', 'pt', 'a4', true); doc.deletePage(1); 
+                
+                // MOBILE FIX: Adaptive PDF scaling to prevent mobile canvas crashes
+                const isMobile = window.innerWidth <= 768;
+                const renderScale = isMobile ? 1.0 : 1.5;
+
                 for (let i = 1; i <= pdf.numPages; i++) {
-                    const page = await pdf.getPage(i); const viewport = page.getViewport({ scale: 1.5 }); 
-                    const canvas = document.createElement('canvas'); canvas.width = viewport.width; canvas.height = viewport.height;
+                    const page = await pdf.getPage(i); 
+                    const viewport = page.getViewport({ scale: renderScale }); 
+                    
+                    const canvas = document.createElement('canvas'); 
+                    canvas.width = viewport.width; 
+                    canvas.height = viewport.height;
+                    
                     await page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise;
-                    doc.addPage([viewport.width, viewport.height]); doc.addImage(canvas.toDataURL('image/jpeg', quality), 'JPEG', 0, 0, viewport.width, viewport.height, '', 'FAST');
+                    doc.addPage([viewport.width, viewport.height]); 
+                    doc.addImage(canvas.toDataURL('image/jpeg', quality), 'JPEG', 0, 0, viewport.width, viewport.height, '', 'FAST');
                 }
                 callback(doc.output('blob'));
             } catch (error) { alert("Error compressing PDF."); }
@@ -507,12 +546,17 @@
             const mergeBtn = document.getElementById('btn-merge-pdfs'); mergeBtn.innerHTML = "Merging..."; mergeBtn.disabled = true;
             const { jsPDF } = window.jspdf; const doc = new jsPDF('p', 'pt', 'a4', true); doc.deletePage(1); 
 
+            // MOBILE FIX: Adaptive Scaling
+            const isMobile = window.innerWidth <= 768;
+            const renderScale = isMobile ? 1.0 : 1.5;
+
             try {
                 for (let cb of checkboxes) {
                     const fileData = fileCache[cb.value]; if (!fileData || fileData.type !== 'application/pdf') continue;
                     const arrayBuffer = await fileData.blob.arrayBuffer(); const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
                     for (let i = 1; i <= pdf.numPages; i++) {
-                        const page = await pdf.getPage(i); const viewport = page.getViewport({ scale: 1.5 }); 
+                        const page = await pdf.getPage(i); 
+                        const viewport = page.getViewport({ scale: renderScale }); 
                         const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
                         canvas.width = viewport.width; canvas.height = viewport.height;
                         await page.render({ canvasContext: ctx, viewport: viewport }).promise;
@@ -534,10 +578,14 @@
 
         function closeViewer() { document.getElementById('viewerModal').style.display = 'none'; document.getElementById('modalBody').innerHTML = ''; }
         
+        // MOBILE FIX: Added a delay before revoking URL so Android Download Manager can catch it
         function triggerBrowserDownload(blob, filename) {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a'); a.href = url; a.download = filename;
-            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+            document.body.appendChild(a); 
+            a.click(); 
+            document.body.removeChild(a); 
+            setTimeout(() => URL.revokeObjectURL(url), 500); // 500ms delay crucial for Android
         }
 
         window.downloadFile = function(id) {
@@ -559,7 +607,6 @@
         // --------------------------------------------------------
         function openCustomModal() { 
             document.getElementById('customMakerModal').style.display = 'flex'; 
-            // Load saved API Key
             const savedKey = localStorage.getItem('removeBgApiKey');
             if (savedKey) document.getElementById('apiKeyInput').value = savedKey;
         }
@@ -625,7 +672,12 @@
             const statusBox = document.getElementById('cStatus');
             statusBox.innerText = "Applying crop...";
             
-            const croppedCanvas = cropper.getCroppedCanvas();
+            // MOBILE FIX: Limit cropped canvas dimensions so mobile RAM doesn't overload
+            const croppedCanvas = cropper.getCroppedCanvas({
+                maxWidth: 3000,
+                maxHeight: 3000
+            });
+            
             if (!croppedCanvas) return;
 
             const mimeType = currentImageBlob && currentImageBlob.type ? currentImageBlob.type : 'image/png';
@@ -639,7 +691,6 @@
             }, mimeType, 1.0);
         }
 
-        // --- NEW API IMPLEMENTATION ---
         async function removeBackgroundAPI() {
             if (!currentImageBlob) return;
             
@@ -714,11 +765,19 @@
             btn.disabled = true;
             statusBox.innerText = "Generating Final Photo...";
 
-            const croppedCanvas = cropper.getCroppedCanvas();
+            // MOBILE FIX: Apply safe caps to the final export to prevent browser crash
+            const croppedCanvas = cropper.getCroppedCanvas({
+                maxWidth: 3000,
+                maxHeight: 3000
+            });
+            
             const finalCanvas = document.createElement('canvas');
             finalCanvas.width = targetW;
             finalCanvas.height = targetH;
             const ctx = finalCanvas.getContext('2d');
+            
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
 
             if (bgMode === 'white') {
                 ctx.fillStyle = '#FFFFFF';
