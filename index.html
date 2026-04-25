@@ -3,13 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Local Document & Photo Vault</title>
+    <title>Local Document & Photo Vault (Pro Edition)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+
+    <style>@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap');</style>
+
     <style>
+        /* ================= BASE VAULT STYLES ================= */
         :root {
             --primary: #4361ee;
             --primary-hover: #3a53d0;
@@ -26,9 +33,7 @@
             --border: #e9ecef;
         }
 
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
 
         body {
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -52,69 +57,33 @@
             gap: 15px;
         }
 
-        .logo {
-            font-size: 1.25rem;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            color: var(--primary);
-        }
+        .logo { font-size: 1.25rem; font-weight: 700; display: flex; align-items: center; gap: 10px; color: var(--primary); }
 
-        .controls {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
+        .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
-        .search-container {
-            position: relative;
-        }
-
+        .search-container { position: relative; }
         .search-input {
-            padding: 10px 15px 10px 35px;
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            outline: none;
-            width: 250px;
-            font-size: 0.9rem;
-            transition: all 0.3s ease;
+            padding: 10px 15px 10px 35px; border: 1px solid var(--border); border-radius: 20px;
+            outline: none; width: 200px; font-size: 0.9rem; transition: all 0.3s ease;
         }
-
-        .search-input:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.15);
-        }
-
-        .search-icon {
-            position: absolute;
-            left: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--text-muted);
-            width: 16px;
-            height: 16px;
-        }
+        .search-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.15); }
+        .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); width: 16px; height: 16px; }
 
         .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            font-size: 0.9rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            padding: 10px 15px; border: none; border-radius: 8px; font-weight: 600;
+            font-size: 0.85rem; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px;
         }
 
         .btn-upload { background-color: var(--primary); color: white; }
         .btn-upload:hover { background-color: var(--primary-hover); }
-        
         .btn-custom { background-color: var(--warning); color: white; }
         .btn-custom:hover { background-color: var(--warning-hover); }
+        
+        /* NEW APP BUTTONS */
+        .btn-bg-rm { background-color: #7209b7; color: white; }
+        .btn-bg-rm:hover { background-color: #560bad; }
+        .btn-dup { background-color: #4cc9f0; color: #111; }
+        .btn-dup:hover { background-color: #3fbadf; }
 
         .btn-success { background-color: var(--success); color: white; width: 100%; justify-content: center; padding: 8px;}
         .btn-success:hover { background-color: var(--success-hover); }
@@ -128,191 +97,138 @@
         
         .btn-download { background-color: var(--primary); color: white; width: 100%; justify-content: center; padding: 8px; }
         .btn-download:hover { background-color: var(--primary-hover); }
-        .btn-download:disabled { background-color: #9ab0f6; cursor: not-allowed; }
 
         .btn-action-header { display: none; padding: 10px 15px; }
 
-        .privacy-banner {
-            background-color: #d4edda;
-            color: #155724;
-            text-align: center;
-            padding: 10px 15px;
-            font-size: 0.85rem;
-            border-bottom: 1px solid #c3e6cb;
-            line-height: 1.4;
-        }
-
+        .privacy-banner { background-color: #d4edda; color: #155724; text-align: center; padding: 10px 15px; font-size: 0.85rem; border-bottom: 1px solid #c3e6cb; line-height: 1.4; }
         main { padding: 30px; max-width: 1400px; margin: 0 auto; }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-            gap: 25px;
-        }
-
-        .card {
-            background-color: var(--card-bg);
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
-            border: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
-            cursor: grab;
-            transition: border 0.2s, opacity 0.2s;
-        }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 25px; }
         
+        .card { background-color: var(--card-bg); border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.02); border: 1px solid var(--border); display: flex; flex-direction: column; cursor: grab; transition: border 0.2s, opacity 0.2s; }
         .card:active { cursor: grabbing; }
-
-        .card-preview {
-            height: 160px;
-            width: 100%;
-            background-color: #f8f9fa;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            border-bottom: 1px solid var(--border);
-            pointer-events: none; 
-        }
-
+        .card-preview { height: 160px; width: 100%; background-color: #f8f9fa; display: flex; align-items: center; justify-content: center; overflow: hidden; border-bottom: 1px solid var(--border); pointer-events: none; }
         .card-preview img { width: 100%; height: 100%; object-fit: cover; }
         .card-preview svg { width: 60px; height: 60px; color: #ff5252; }
 
         .card-body { padding: 15px; display: flex; flex-direction: column; flex-grow: 1; }
         .card-title { margin: 0 0 5px 0; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 8px;}
-        
         .file-select-cb { cursor: pointer; width: 16px; height: 16px; margin: 0; flex-shrink: 0;}
-        
         .card-meta { font-size: 0.8rem; color: var(--text-muted); margin: 0 0 10px 0; display:flex; justify-content: space-between;}
-
-        .edit-tools {
-            background: #f8f9fa;
-            padding: 10px;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            border: 1px solid var(--border);
-        }
-
+        .edit-tools { background: #f8f9fa; padding: 10px; border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border); }
         .input-row { display: flex; gap: 5px; margin-bottom: 10px; }
-        .input-row input[type="number"], .input-row select {
-            width: 33%;
-            padding: 8px;
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            font-size: 0.85rem;
-        }
+        .input-row input[type="number"], .input-row select { width: 33%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 0.85rem; }
         .input-row input[type="number"] { flex-grow: 1; }
-
-        .slider-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 10px;
-            font-size: 0.8rem;
-        }
-        
+        .slider-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 0.8rem; }
         .slider-row input[type="range"] { flex-grow: 1; }
-        
         .est-size { font-weight: bold; color: var(--primary); min-width: 60px; text-align: right; font-size: 0.75rem; }
-
         .button-group { display: flex; gap: 5px; margin-top: auto; }
-        
-        /* Adjusted button group text size to fit mobile nicely */
-        .button-group .btn {
-            font-size: 0.75rem;
-            padding: 8px 4px;
-        }
-
+        .button-group .btn { font-size: 0.75rem; padding: 8px 4px; }
         .empty-state { grid-column: 1 / -1; text-align: center; padding: 60px 20px; color: var(--text-muted); }
         .empty-state svg { width: 80px; height: 80px; margin-bottom: 20px; opacity: 0.5; }
         #fileInput { display: none; }
 
-        /* Modal Styles */
+        /* Modal Overlays */
         .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.8);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.8); z-index: 1000; justify-content: center; align-items: center; padding: 20px;
         }
-        
         .modal-content {
-            background: var(--card-bg);
-            border-radius: 12px;
-            width: 90%;
-            max-width: 1000px;
-            height: 90vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            position: relative;
+            background: var(--card-bg); border-radius: 12px; width: 90%; max-width: 1100px;
+            height: 90vh; display: flex; flex-direction: column; overflow: hidden; position: relative;
         }
-
-        .modal-content.custom-tool {
-            max-width: 500px;
-            height: auto;
-        }
-
-        .modal-header {
-            padding: 15px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .modal-body {
-            flex-grow: 1;
-            background: #e9ecef;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: auto;
-        }
-
-        .modal-body.custom-body {
-            background: var(--card-bg);
-            flex-direction: column;
-            padding: 25px;
-            align-items: stretch;
-            gap: 15px;
-        }
-
+        .modal-content.custom-tool { max-width: 500px; height: auto; }
+        .modal-header { padding: 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
+        .modal-body { flex-grow: 1; background: #e9ecef; overflow: auto; display: block;}
+        .modal-body.viewer-body { display: flex; justify-content: center; align-items: center; }
+        .modal-body.custom-body { background: var(--card-bg); display: flex; flex-direction: column; padding: 25px; align-items: stretch; gap: 15px; }
         .modal-body img { max-width: 100%; max-height: 100%; object-fit: contain; }
         .modal-body iframe { width: 100%; height: 100%; border: none; }
 
+        /* ================= BACKGROUND REMOVER STYLES ================= */
+        .bg-remover-container { text-align: center; background: #0f172a; color: white; padding: 20px; min-height: 100%;}
+        .bg-remover-container .control-panel { background: #1e293b; padding: 15px; border-radius: 10px; display: inline-block; margin: 15px 0; box-shadow: 0 4px 15px rgba(0,0,0,0.3); text-align: left; }
+        .bg-remover-container .control-group { margin-bottom: 10px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;}
+        .bg-remover-container canvas { margin-top: 20px; border-radius: 10px; max-width: 100%; background-image: repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%); background-position: 0 0, 10px 10px; background-size: 20px 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .bg-remover-container button { padding: 12px 25px; background: #25D366; border: none; color: white; font-weight: bold; cursor: pointer; border-radius: 6px; transition: 0.3s; }
+        .bg-remover-container button:hover { background: #1da851; }
+        .bg-remover-container .btn-secondary { background: #3b82f6; }
+        .bg-remover-container .btn-secondary:hover { background: #2563eb; }
+        .bg-remover-container select, .bg-remover-container input[type="file"], .bg-remover-container input[type="number"], .bg-remover-container input[type="color"] { padding: 8px; border-radius: 4px; border: 1px solid #555; background: #fff; color: #000; }
+        .bg-remover-container .loader { display: none; margin-top: 20px; color: #facc15; font-weight: bold; }
+        .bg-remover-container #download-btn { display: none; margin-top: 20px; padding: 12px 25px; background: #3b82f6; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; }
+        
+        #crop-modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.9); z-index: 2000; padding: 20px; flex-direction: column; align-items: center; justify-content: center; color: white;}
+        .crop-container { max-width: 90%; max-height: 70vh; margin-bottom: 20px; }
+        #crop-image { max-width: 100%; max-height: 70vh; display: block; }
+
+        /* ================= DUPLICATOR STYLES ================= */
+        .duplicator-container {
+            --d-bg: #0e0e0f; --d-surface: #171718; --d-border: #2a2a2d; --d-accent: #e8ff47; --d-accent2: #ff6b35; --d-text: #f0f0f0; --d-muted: #666; --d-radius: 12px;
+            background: var(--d-bg); color: var(--d-text); font-family: 'DM Mono', monospace;
+            min-height: 100%; display: flex; flex-direction: column; align-items: center; padding: 40px 20px 60px; gap: 32px;
+        }
+        .duplicator-container header { text-align: center; }
+        .duplicator-container header h1 { font-family: 'Syne', sans-serif; font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 800; letter-spacing: -1px; line-height: 1; margin:0; }
+        .duplicator-container header h1 span { color: var(--d-accent); }
+        .duplicator-container header p { margin-top: 8px; color: var(--d-muted); font-size: 0.82rem; letter-spacing: 0.08em; text-transform: uppercase; }
+        .duplicator-container .panel { background: var(--d-surface); border: 1px solid var(--d-border); border-radius: var(--d-radius); padding: 28px 32px; width: 100%; max-width: 640px; display: flex; flex-direction: column; gap: 20px; }
+        .duplicator-container .field { display: flex; flex-direction: column; gap: 8px; }
+        .duplicator-container .field label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--d-muted); }
+        .duplicator-container .upload-zone { border: 2px dashed var(--d-border); border-radius: var(--d-radius); padding: 36px 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; cursor: pointer; transition: border-color 0.2s, background 0.2s; position: relative; }
+        .duplicator-container .upload-zone:hover, .duplicator-container .upload-zone.drag { border-color: var(--d-accent); background: rgba(232,255,71,0.04); }
+        .duplicator-container .upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+        .duplicator-container .upload-zone .icon { font-size: 2.4rem; line-height: 1; }
+        .duplicator-container .upload-zone .hint { font-size: 0.8rem; color: var(--d-muted); }
+        .duplicator-container .upload-zone .filename { font-size: 0.85rem; color: var(--d-accent); font-weight: 500; word-break: break-all; text-align: center; }
+        .duplicator-container .count-row { display: flex; align-items: center; gap: 12px; }
+        .duplicator-container .count-row input[type="number"] { background: var(--d-bg); border: 1px solid var(--d-border); border-radius: 8px; color: var(--d-text); font-family: 'DM Mono', monospace; font-size: 1.4rem; font-weight: 500; width: 100px; padding: 10px 14px; outline: none; transition: border-color 0.2s; -moz-appearance: textfield; }
+        .duplicator-container .count-row input[type="number"]::-webkit-outer-spin-button, .duplicator-container .count-row input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+        .duplicator-container .count-row input[type="number"]:focus { border-color: var(--d-accent); }
+        .duplicator-container .count-info { font-size: 0.78rem; color: var(--d-muted); line-height: 1.5; }
+        .duplicator-container .count-info strong { color: var(--d-text); }
+        .duplicator-container .btn-row { display: flex; gap: 12px; flex-wrap: wrap; }
+        .duplicator-container button { font-family: 'DM Mono', monospace; font-size: 0.8rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; border: none; border-radius: 8px; padding: 12px 22px; cursor: pointer; transition: transform 0.15s, opacity 0.15s, box-shadow 0.15s; }
+        .duplicator-container button:active { transform: scale(0.97); }
+        .duplicator-container button:disabled { opacity: 0.35; cursor: not-allowed; }
+        .duplicator-container .btn-primary { background: var(--d-accent); color: #111; flex: 1; }
+        .duplicator-container .btn-primary:hover:not(:disabled) { box-shadow: 0 0 0 3px rgba(232,255,71,0.3); }
+        .duplicator-container .btn-secondary { background: var(--d-accent2); color: #fff; flex: 1; }
+        .duplicator-container .btn-secondary:hover:not(:disabled) { box-shadow: 0 0 0 3px rgba(255,107,53,0.3); }
+        .duplicator-container .btn-ghost { background: var(--d-border); color: var(--d-muted); }
+        .duplicator-container .btn-ghost:hover:not(:disabled) { background: #333; color: var(--d-text); }
+        .duplicator-container .preview-section { width: 100%; max-width: 960px; }
+        .duplicator-container .preview-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+        .duplicator-container .preview-header h2 { font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 700; margin:0;}
+        .duplicator-container .badge { background: var(--d-border); color: var(--d-muted); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; padding: 4px 10px; border-radius: 20px; }
+        .duplicator-container .badge.active { background: rgba(232,255,71,0.15); color: var(--d-accent); }
+        .duplicator-container #photo-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; background: var(--d-surface); border: 1px solid var(--d-border); border-radius: var(--d-radius); padding: 16px; }
+        .duplicator-container .photo-cell { aspect-ratio: 3/4; border-radius: 6px; overflow: hidden; background: var(--d-border); }
+        .duplicator-container .photo-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .duplicator-container .empty-state { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 60px 20px; color: var(--d-muted); font-size: 0.82rem; }
+        .duplicator-container .empty-state .big { font-size: 3rem; line-height: 1; }
+        .duplicator-container #status { font-size: 0.78rem; color: var(--d-muted); text-align: center; min-height: 18px; transition: color 0.2s; }
+        .duplicator-container #status.ok { color: var(--d-accent); }
+        .duplicator-container #status.err { color: #ff4444; }
+
+
+        /* ================= RESPONSIVE ADJUSTMENTS ================= */
         @media (max-width: 768px) {
             header { flex-direction: column; gap: 15px; padding: 15px; align-items: stretch; }
             .logo { justify-content: center; }
             .controls { flex-direction: column; width: 100%; }
-            .search-container, .search-input, .btn { width: 100%; }
+            .search-container, .search-input, .btn { width: 100%; justify-content: center;}
             .grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
             .card-preview { height: 100px; }
             .modal-content { width: 100%; height: 100vh; border-radius: 0; }
             .modal-content.custom-tool { height: auto; border-radius: 12px; margin: 20px; }
-
-            .slider-row {
-                flex-wrap: wrap;
-            }
-            .slider-row label {
-                flex-grow: 1; 
-            }
-            .slider-row input[type="range"] {
-                order: 3; 
-                flex-basis: 100%; 
-                margin-top: 5px;
-            }
+            .slider-row { flex-wrap: wrap; }
+            .slider-row label { flex-grow: 1; }
+            .slider-row input[type="range"] { order: 3; flex-basis: 100%; margin-top: 5px; }
+            .input-row { flex-wrap: wrap; }
+            .input-row input[type="number"], .input-row select { width: 48%; }
             
-            .input-row {
-                flex-wrap: wrap;
-            }
-            .input-row input[type="number"], .input-row select {
-                width: 48%;
-            }
+            .duplicator-container #photo-grid { grid-template-columns: repeat(3, 1fr); }
+            .duplicator-container .btn-row { flex-direction: column; }
         }
     </style>
 </head>
@@ -321,7 +237,7 @@
     <header>
         <div class="logo">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-            LocalVault
+            LocalVault Pro
         </div>
         <div class="controls">
             <div class="search-container">
@@ -334,12 +250,19 @@
                 Select All
             </label>
 
-            <button class="btn btn-danger btn-action-header" id="btn-delete-selected" onclick="deleteSelected()">Delete Selected</button>
+            <button class="btn btn-danger btn-action-header" id="btn-delete-selected" onclick="deleteSelected()">Delete</button>
             <button class="btn btn-success btn-action-header" id="btn-merge-pdfs" onclick="mergeSelectedPDFs()">Merge PDFs</button>
 
             <button class="btn btn-custom" onclick="openCustomModal()">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="14 2 18 6 7 17 3 17 3 13 14 2"></polygon><line x1="3" y1="22" x2="21" y2="22"></line></svg>
                 Custom Photo Maker
+            </button>
+
+            <button class="btn btn-bg-rm" onclick="openBgRemoverModal()">
+                ✂️ Remove Photo Background
+            </button>
+            <button class="btn btn-dup" onclick="openDuplicatorModal()">
+                🖨️ Duplicate & Print Photo
             </button>
 
             <input type="file" id="fileInput" accept="image/*,application/pdf" multiple>
@@ -348,7 +271,7 @@
     </header>
 
     <div class="privacy-banner">
-        ⚠️ <strong>Privacy Note:</strong> Files are saved locally. <strong>Drag and drop cards</strong> to arrange their order!
+        ⚠️ <strong>Privacy Note:</strong> All files and processing remain completely local. <strong>Drag and drop cards</strong> to arrange their order!
     </div>
 
     <main>
@@ -361,7 +284,7 @@
                 <h3 id="modalTitle" style="margin: 0;">File Viewer</h3>
                 <button class="btn btn-danger" style="width: auto; padding: 8px 15px;" onclick="closeViewer()">Close</button>
             </div>
-            <div class="modal-body" id="modalBody"></div>
+            <div class="modal-body viewer-body" id="modalBody"></div>
         </div>
     </div>
 
@@ -400,6 +323,112 @@
             </div>
         </div>
     </div>
+
+    <div class="modal-overlay" id="bgRemoverModalOverlay">
+        <div class="modal-content" style="background: #0f172a; color: white;">
+            <div class="modal-header" style="border-bottom: 1px solid #333;">
+                <h3 style="margin: 0;">🔥 PRO AI Editor (Crop, Remove BG, Border)</h3>
+                <button class="btn btn-danger" style="width: auto; padding: 8px 15px;" onclick="closeBgRemoverModal()">Close</button>
+            </div>
+            <div class="modal-body bg-remover-container">
+                <input type="file" id="bg-upload" accept="image/*">
+                <br>
+                <div class="control-panel">
+                    <div class="control-group">
+                        <label><b>Quality:</b></label>
+                        <select id="bg-quality">
+                        <option value="fast">⚡ Fast Mode</option>
+                        <option value="high" selected>🔥 High Quality (Smooth Edges)</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label><b>Background:</b></label>
+                        <input type="checkbox" id="transparent-bg" checked> <label for="transparent-bg">Transparent</label>
+                        <input type="color" id="bg-color" value="#ff0000" title="Choose solid color">
+                    </div>
+                    <div class="control-group">
+                        <label><b>Border Size (px):</b></label>
+                        <input type="number" id="border-size" value="0" min="0" style="width: 60px;">
+                        <label><b>Color:</b></label>
+                        <input type="color" id="border-color" value="#ffffff">
+                    </div>
+                </div>
+                <br>
+                <button onclick="processBgImage()">Process Image</button>
+                <div class="loader" id="bg-loader">⏳ Processing Image...</div>
+                <div>
+                    <canvas id="bg-canvas"></canvas>
+                </div>
+                <a id="download-btn" download="edited-photo.png">⬇️ Download Image</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="crop-modal">
+        <h3 style="margin-top: 0;">Crop Your Image</h3>
+        <div class="crop-container">
+           <img id="crop-image" src="">
+        </div>
+        <div style="display: flex; gap:10px;">
+           <button class="btn-secondary" onclick="applyCrop()">✅ Apply Crop</button>
+           <button style="background: #ef4444; padding: 12px 25px; border:none; color:white; font-weight:bold; border-radius:6px; cursor:pointer;" onclick="cancelCrop()">❌ Cancel</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="duplicatorModalOverlay">
+        <div class="modal-content" style="background: #0e0e0f; color: #f0f0f0;">
+             <div class="modal-header" style="border-bottom: 1px solid #333;">
+                <h3 style="margin: 0; color: white;">Photo Duplicator</h3>
+                <button class="btn btn-danger" style="width: auto; padding: 8px 15px;" onclick="closeDuplicatorModal()">Close</button>
+            </div>
+            <div class="modal-body duplicator-container">
+                <header>
+                    <h1>Photo <span>Duplicator</span></h1>
+                    <p>Upload · Set count · Download PDF</p>
+                </header>
+                <div class="panel">
+                    <div class="field">
+                        <label>📷 Upload Photo</label>
+                        <div class="upload-zone" id="drop-zone">
+                            <input type="file" id="dup-file-input" accept="image/*">
+                            <div class="icon">🖼️</div>
+                            <div class="hint">Click or drag & drop an image</div>
+                            <div class="filename" id="dup-file-name">No file chosen</div>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>🔢 Number of copies</label>
+                        <div class="count-row">
+                            <input type="number" id="count-input" value="6" min="1" max="120">
+                            <div class="count-info">
+                                <strong id="rows-info">1 row</strong> × 6 columns<br>
+                                <span id="total-info">6 photos total</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="dup-status">Waiting for image…</div>
+                    <div class="btn-row">
+                        <button class="btn-primary" id="btn-generate" disabled>Generate Grid</button>
+                        <button class="btn-secondary" id="btn-pdf" disabled>⬇ Download PDF</button>
+                        <button class="btn-ghost" id="btn-clear">Clear</button>
+                    </div>
+                </div>
+                <div class="preview-section" id="preview-section" style="display:none">
+                    <div class="preview-header">
+                        <h2>Preview</h2>
+                        <span class="badge active" id="grid-badge">0 photos</span>
+                    </div>
+                    <div id="photo-grid">
+                        <div class="empty-state">
+                            <div class="big">📷</div>
+                            <div>Your duplicated photos will appear here</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 
     <script>
         const DB_NAME = "LocalVaultDB";
@@ -509,11 +538,7 @@
             }
         };
 
-        window.dragStart = function(event, id) {
-            draggedId = id;
-            event.dataTransfer.effectAllowed = "move";
-            setTimeout(() => { event.target.style.opacity = "0.5"; }, 0);
-        };
+        window.dragStart = function(event, id) { draggedId = id; event.dataTransfer.effectAllowed = "move"; setTimeout(() => { event.target.style.opacity = "0.5"; }, 0); };
         window.dragOver = function(event) { event.preventDefault(); const c = event.target.closest('.card'); if(c) c.style.border = "2px dashed var(--primary)"; };
         window.dragLeave = function(event) { const c = event.target.closest('.card'); if(c) c.style.border = "1px solid var(--border)"; };
         window.dragEnd = function(event) { event.target.style.opacity = "1"; };
@@ -535,7 +560,6 @@
                     const [draggedItem] = allFiles.splice(draggedIdx, 1);
                     allFiles.splice(targetIdx, 0, draggedItem);
                     const baseTime = new Date().getTime();
-                    
                     const storeWrite = db.transaction([STORE_NAME], "readwrite").objectStore(STORE_NAME);
                     allFiles.forEach((file, idx) => { file.timestamp = baseTime - idx; storeWrite.put(file); });
                     storeWrite.transaction.oncomplete = () => { draggedId = null; loadFiles(); };
@@ -547,10 +571,7 @@
             const grid = document.getElementById('gridContainer');
             db.transaction([STORE_NAME], "readonly").objectStore(STORE_NAME).getAll().onsuccess = (e) => {
                 const files = e.target.result;
-                grid.innerHTML = '';
-                fileCache = {};
-                toggleBulkActions(); 
-
+                grid.innerHTML = ''; fileCache = {}; toggleBulkActions(); 
                 const filteredFiles = files.filter(f => f.name.toLowerCase().includes(searchQuery));
                 filteredFiles.sort((a, b) => b.timestamp - a.timestamp);
 
@@ -565,14 +586,8 @@
                     const isImage = file.type.startsWith('image/');
                     const isPdf = file.type === 'application/pdf';
                     
-                    const card = document.createElement('div');
-                    card.className = 'card';
-                    card.setAttribute('draggable', 'true');
-                    card.setAttribute('ondragstart', `dragStart(event, ${file.id})`);
-                    card.setAttribute('ondragover', `dragOver(event)`);
-                    card.setAttribute('ondragleave', `dragLeave(event)`);
-                    card.setAttribute('ondragend', `dragEnd(event)`);
-                    card.setAttribute('ondrop', `drop(event, ${file.id})`);
+                    const card = document.createElement('div'); card.className = 'card';
+                    card.setAttribute('draggable', 'true'); card.setAttribute('ondragstart', `dragStart(event, ${file.id})`); card.setAttribute('ondragover', `dragOver(event)`); card.setAttribute('ondragleave', `dragLeave(event)`); card.setAttribute('ondragend', `dragEnd(event)`); card.setAttribute('ondrop', `drop(event, ${file.id})`);
                     
                     let previewHTML = isImage ? `<img src="${fileUrl}" alt="${file.name}">` : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>`;
 
@@ -592,13 +607,11 @@
                         <div class="card-body">
                             <h3 class="card-title">${cbScript}<span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${file.name}</span> <span onclick="renameFile(${file.id})" style="cursor:pointer; color:var(--primary); margin-left:auto;">✏️</span></h3>
                             <div class="card-meta"><span>${formatDate(file.timestamp)}</span><span>${formatBytes(file.size)}</span></div>
-                            
                             <div class="edit-tools" onmousedown="this.closest('.card').setAttribute('draggable', false);" onmouseup="this.closest('.card').setAttribute('draggable', true);" onmouseleave="this.closest('.card').setAttribute('draggable', true);">
                                 <div class="input-row">${dimScript}<input type="number" id="dpi-${file.id}" placeholder="DPI" value="72" ${isPdf ? 'disabled' : ''}></div>
                                 <div class="slider-row"><label>Vol:</label><input type="range" id="q-${file.id}" min="0.1" max="1.0" step="0.1" value="0.8" oninput="estimateSize(${file.id}, this.value)"><span class="est-size" id="est-${file.id}">${formatBytes(file.size)}</span></div>
                                 <button class="btn btn-success" id="btn-comp-${file.id}" onclick="applyCompression(${file.id})">Compress</button>
                             </div>
-
                             <div class="button-group">
                                 <button class="btn btn-view" onclick="openViewer(${file.id})" title="View">View</button>
                                 <button class="btn btn-download" id="btn-dl-${file.id}" onclick="downloadFile(${file.id})" title="Download">Download</button>
@@ -645,9 +658,7 @@
 
         let estimationTimer;
         function estimateSize(id, quality) {
-            clearTimeout(estimationTimer);
-            const fileData = fileCache[id];
-            if (!fileData) return;
+            clearTimeout(estimationTimer); const fileData = fileCache[id]; if (!fileData) return;
             document.getElementById(`est-${id}`).innerText = "Calc...";
 
             estimationTimer = setTimeout(() => {
@@ -661,17 +672,14 @@
         }
 
         function applyCompression(id) {
-            const fileData = fileCache[id];
-            if (!fileData) return;
+            const fileData = fileCache[id]; if (!fileData) return;
             const quality = parseFloat(document.getElementById(`q-${id}`).value);
             const btn = document.getElementById(`btn-comp-${id}`);
             btn.innerText = "Processing..."; btn.disabled = true;
 
             const onComplete = (blob) => {
                 fileData.blob = blob; fileData.size = blob.size;
-                db.transaction([STORE_NAME], "readwrite").objectStore(STORE_NAME).put(fileData).onsuccess = () => {
-                    alert("Compressed locally!"); loadFiles();
-                };
+                db.transaction([STORE_NAME], "readwrite").objectStore(STORE_NAME).put(fileData).onsuccess = () => { alert("Compressed locally!"); loadFiles(); };
             };
 
             if (fileData.type === 'application/pdf') compressPDFBlob(fileData.blob, quality, onComplete);
@@ -708,14 +716,12 @@
         }
 
         function openViewer(id) {
-            const fileData = fileCache[id];
-            if (!fileData) return;
+            const fileData = fileCache[id]; if (!fileData) return;
             const url = URL.createObjectURL(fileData.blob);
             document.getElementById('modalTitle').innerText = fileData.name;
             document.getElementById('modalBody').innerHTML = fileData.type.startsWith('image/') ? `<img src="${url}">` : `<iframe src="${url}"></iframe>`;
             document.getElementById('viewerModal').style.display = 'flex';
         }
-
         function closeViewer() { document.getElementById('viewerModal').style.display = 'none'; document.getElementById('modalBody').innerHTML = ''; }
         
         function triggerBrowserDownload(blob, filename) {
@@ -744,102 +750,275 @@
             db.transaction([STORE_NAME], "readwrite").objectStore(STORE_NAME).delete(id).onsuccess = () => loadFiles();
         };
 
-        // --------------------------------------------------------
-        // NEW CUSTOM PHOTO MAKER LOGIC
-        // --------------------------------------------------------
-        function openCustomModal() {
-            document.getElementById('customMakerModal').style.display = 'flex';
-        }
-
+        // CUSTOM PHOTO MAKER LOGIC
+        function openCustomModal() { document.getElementById('customMakerModal').style.display = 'flex'; }
         function closeCustomModal() {
             document.getElementById('customMakerModal').style.display = 'none';
-            document.getElementById('cFileInput').value = '';
-            document.getElementById('cPreview').innerHTML = '';
-            document.getElementById('cStatus').innerText = '';
-            document.getElementById('cWidth').value = '';
-            document.getElementById('cHeight').value = '';
-            document.getElementById('cSize').value = '';
+            document.getElementById('cFileInput').value = ''; document.getElementById('cPreview').innerHTML = ''; document.getElementById('cStatus').innerText = '';
+            document.getElementById('cWidth').value = ''; document.getElementById('cHeight').value = ''; document.getElementById('cSize').value = '';
         }
-
         function previewCustomPhoto(event) {
             const file = event.target.files[0];
             if (file) {
                 const url = URL.createObjectURL(file);
                 document.getElementById('cPreview').innerHTML = `<img src="${url}" style="width: 100%; height: 100%; object-fit: contain;">`;
-                
                 const img = new Image();
-                img.onload = () => {
-                    if(!document.getElementById('cWidth').value) document.getElementById('cWidth').value = img.width;
-                    if(!document.getElementById('cHeight').value) document.getElementById('cHeight').value = img.height;
-                };
+                img.onload = () => { if(!document.getElementById('cWidth').value) document.getElementById('cWidth').value = img.width; if(!document.getElementById('cHeight').value) document.getElementById('cHeight').value = img.height; };
                 img.src = url;
             }
         }
-
         async function processCustomPhoto() {
-            const fileInput = document.getElementById('cFileInput');
-            const file = fileInput.files[0];
-            
+            const fileInput = document.getElementById('cFileInput'); const file = fileInput.files[0];
             if (!file) return alert("Please browse and select a photo first.");
-            
-            const w = document.getElementById('cWidth').value;
-            const h = document.getElementById('cHeight').value;
-            const sizeInput = parseFloat(document.getElementById('cSize').value);
-            const unit = document.getElementById('cUnit').value;
-
+            const w = document.getElementById('cWidth').value; const h = document.getElementById('cHeight').value;
+            const sizeInput = parseFloat(document.getElementById('cSize').value); const unit = document.getElementById('cUnit').value;
             if (!w || !h || !sizeInput) return alert("Please provide Width, Height, and Target Size.");
 
             const targetBytes = sizeInput * (unit === 'MB' ? 1024 * 1024 : 1024);
-            const btn = document.getElementById('btnMakePhoto');
-            const statusBox = document.getElementById('cStatus');
+            const btn = document.getElementById('btnMakePhoto'); const statusBox = document.getElementById('cStatus');
+            btn.disabled = true; statusBox.innerText = "Finding best match... please wait.";
 
-            btn.disabled = true;
-            statusBox.innerText = "Finding best match for target size... please wait.";
-
-            const img = new Image();
-            img.src = URL.createObjectURL(file);
-
+            const img = new Image(); img.src = URL.createObjectURL(file);
             img.onload = async () => {
-                const canvas = document.createElement('canvas');
-                canvas.width = parseInt(w);
-                canvas.height = parseInt(h);
+                const canvas = document.createElement('canvas'); canvas.width = parseInt(w); canvas.height = parseInt(h);
                 const ctx = canvas.getContext('2d');
-                
-                // Draw background white in case image is transparent png -> jpg
-                ctx.fillStyle = '#FFFFFF';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-                // Binary search for closest quality that meets size requirements
-                let minQuality = 0.01;
-                let maxQuality = 1.0;
-                let bestBlob = null;
-
+                let minQuality = 0.01; let maxQuality = 1.0; let bestBlob = null;
                 for (let i = 0; i < 8; i++) {
                     let midQuality = (minQuality + maxQuality) / 2;
                     let blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', midQuality));
-                    
-                    if (blob.size > targetBytes) {
-                        maxQuality = midQuality; // File too big, lower the ceiling
-                    } else {
-                        minQuality = midQuality; // File fits, try raising the floor for better visual quality
-                        bestBlob = blob;
-                    }
+                    if (blob.size > targetBytes) maxQuality = midQuality;
+                    else { minQuality = midQuality; bestBlob = blob; }
                 }
-
-                // Fallback to lowest possible quality if it couldn't get small enough
-                if (!bestBlob) {
-                    bestBlob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.01));
-                }
+                if (!bestBlob) bestBlob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.01));
 
                 statusBox.innerText = `Final Size Generated: ${formatBytes(bestBlob.size)}`;
-                
-                const newName = file.name.replace(/\.[^/.]+$/, "") + "_custom.jpg";
-                triggerBrowserDownload(bestBlob, newName);
-
+                triggerBrowserDownload(bestBlob, file.name.replace(/\.[^/.]+$/, "") + "_custom.jpg");
                 btn.disabled = false;
             };
         }
+
+
+        // ==============================================
+        // TOOL 1: BACKGROUND REMOVER LOGIC
+        // ==============================================
+        function openBgRemoverModal() { document.getElementById('bgRemoverModalOverlay').style.display = 'flex'; }
+        function closeBgRemoverModal() { document.getElementById('bgRemoverModalOverlay').style.display = 'none'; }
+
+        let bgImgSource = new Image();
+        let bgCropper = null;
+        
+        document.getElementById("bg-upload").onchange = function(e) {
+            if (e.target.files.length > 0) {
+                const fileUrl = URL.createObjectURL(e.target.files[0]);
+                const cropImgEl = document.getElementById("crop-image");
+                cropImgEl.src = fileUrl;
+                document.getElementById("crop-modal").style.display = "flex";
+                if (bgCropper) bgCropper.destroy();
+                bgCropper = new Cropper(cropImgEl, { viewMode: 1, autoCropArea: 1, background: false });
+                document.getElementById("bg-canvas").style.display = "none";
+                document.getElementById("download-btn").style.display = "none";
+            }
+        };
+        
+        function applyCrop() {
+            if (!bgCropper) return;
+            const croppedCanvas = bgCropper.getCroppedCanvas();
+            bgImgSource.src = croppedCanvas.toDataURL("image/png");
+            document.getElementById("crop-modal").style.display = "none";
+        }
+        function cancelCrop() {
+            document.getElementById("crop-modal").style.display = "none";
+            document.getElementById("bg-upload").value = ""; 
+        }
+        
+        const segmentationModel = new SelfieSegmentation({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}` });
+        
+        async function processBgImage() {
+            if (!bgImgSource.src) return alert("Please upload and crop an image first!");
+            document.getElementById("bg-loader").style.display = "block";
+            document.getElementById("bg-canvas").style.display = "none";
+            document.getElementById("download-btn").style.display = "none";
+        
+            const canvas = document.getElementById("bg-canvas");
+            const ctx = canvas.getContext("2d", { willReadFrequently: true });
+            canvas.width = bgImgSource.width; canvas.height = bgImgSource.height;
+            const quality = document.getElementById("bg-quality").value;
+        
+            segmentationModel.setOptions({ modelSelection: quality === "high" ? 1 : 0 });
+            segmentationModel.onResults(results => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.filter = quality === "high" ? "blur(2.5px)" : "blur(1px)";
+                ctx.drawImage(results.segmentationMask, 0, 0, canvas.width, canvas.height);
+                ctx.filter = "none"; 
+                ctx.globalCompositeOperation = "source-in";
+                ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+                ctx.globalCompositeOperation = "source-over";
+        
+                if (quality === "high") {
+                    let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    let data = imageData.data;
+                    for (let i = 0; i < data.length; i += 4) {
+                        let alpha = data[i + 3];
+                        if (alpha > 0 && alpha < 255) {
+                            if (alpha < 50) data[i + 3] = 0; 
+                            else data[i + 3] = ((alpha - 50) / 205) * 255;
+                        }
+                    }
+                    ctx.putImageData(imageData, 0, 0);
+                }
+        
+                const isTransparent = document.getElementById("transparent-bg").checked;
+                if (!isTransparent) {
+                    ctx.globalCompositeOperation = "destination-over";
+                    ctx.fillStyle = document.getElementById("bg-color").value;
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.globalCompositeOperation = "source-over"; 
+                }
+        
+                const borderSize = parseInt(document.getElementById("border-size").value) || 0;
+                if (borderSize > 0) {
+                    ctx.lineWidth = borderSize;
+                    ctx.strokeStyle = document.getElementById("border-color").value;
+                    ctx.strokeRect(borderSize / 2, borderSize / 2, canvas.width - borderSize, canvas.height - borderSize);
+                }
+        
+                const url = canvas.toDataURL("image/png");
+                const downloadBtn = document.getElementById("download-btn");
+                downloadBtn.href = url; downloadBtn.style.display = "inline-block";
+                canvas.style.display = "inline-block"; document.getElementById("bg-loader").style.display = "none";
+            });
+            await segmentationModel.send({ image: bgImgSource });
+        }
+        
+        document.getElementById('transparent-bg').addEventListener('change', function() {
+            document.getElementById('bg-color').disabled = this.checked;
+            document.getElementById('bg-color').style.opacity = this.checked ? '0.5' : '1';
+        });
+        document.getElementById('transparent-bg').dispatchEvent(new Event('change'));
+
+
+        // ==============================================
+        // TOOL 2: DUPLICATOR LOGIC
+        // ==============================================
+        function openDuplicatorModal() { document.getElementById('duplicatorModalOverlay').style.display = 'flex'; }
+        function closeDuplicatorModal() { document.getElementById('duplicatorModalOverlay').style.display = 'none'; }
+
+        const dupFileInput = document.getElementById('dup-file-input');
+        const dupDropZone  = document.getElementById('drop-zone');
+        const dupFileName  = document.getElementById('dup-file-name');
+        const dupCountInput= document.getElementById('count-input');
+        const dupRowsInfo  = document.getElementById('rows-info');
+        const dupTotalInfo = document.getElementById('total-info');
+        const dupStatus    = document.getElementById('dup-status');
+        const dupBtnGen    = document.getElementById('btn-generate');
+        const dupBtnPdf    = document.getElementById('btn-pdf');
+        const dupBtnClear  = document.getElementById('btn-clear');
+        const dupGrid      = document.getElementById('photo-grid');
+        const dupGridBadge = document.getElementById('grid-badge');
+        const dupPreviewSec= document.getElementById('preview-section');
+
+        let dupImageDataURL = null;
+
+        dupDropZone.addEventListener('dragover', e => { e.preventDefault(); dupDropZone.classList.add('drag'); });
+        dupDropZone.addEventListener('dragleave', () => dupDropZone.classList.remove('drag'));
+        dupDropZone.addEventListener('drop', e => {
+            e.preventDefault(); dupDropZone.classList.remove('drag');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) dupLoadFile(file);
+        });
+
+        dupFileInput.addEventListener('change', () => { if (dupFileInput.files[0]) dupLoadFile(dupFileInput.files[0]); });
+
+        function dupLoadFile(file) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                dupImageDataURL = e.target.result;
+                dupFileName.textContent = file.name;
+                setDupStatus('Image loaded! Click "Generate Grid".', 'ok');
+                dupBtnGen.disabled = false;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        dupCountInput.addEventListener('input', updateDupCountInfo);
+        function updateDupCountInfo() {
+            const n = Math.max(1, parseInt(dupCountInput.value) || 1);
+            const rows = Math.ceil(n / 6);
+            dupRowsInfo.textContent = `${rows} row${rows > 1 ? 's' : ''}`;
+            dupTotalInfo.textContent = `${n} photo${n > 1 ? 's' : ''} total`;
+        }
+        updateDupCountInfo();
+
+        dupBtnGen.addEventListener('click', () => {
+            if (!dupImageDataURL) return;
+            const n = Math.max(1, Math.min(120, parseInt(dupCountInput.value) || 6));
+            dupCountInput.value = n;
+
+            dupGrid.innerHTML = '';
+            dupPreviewSec.style.display = 'block';
+            dupGridBadge.textContent = `${n} photos`;
+
+            for (let i = 0; i < n; i++) {
+                const cell = document.createElement('div'); cell.className = 'photo-cell';
+                const img = document.createElement('img'); img.src = dupImageDataURL; img.alt = `Photo ${i + 1}`;
+                cell.appendChild(img); dupGrid.appendChild(cell);
+            }
+
+            setDupStatus(`✓ ${n} photos arranged in ${Math.ceil(n/6)} row(s).`, 'ok');
+            dupBtnPdf.disabled = false;
+            dupPreviewSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+
+        dupBtnPdf.addEventListener('click', async () => {
+            if (!dupImageDataURL) return;
+            const n = Math.max(1, Math.min(120, parseInt(dupCountInput.value) || 6));
+            setDupStatus('Generating PDF…', ''); dupBtnPdf.disabled = true;
+
+            try {
+                const { jsPDF } = window.jspdf;
+                const PAGE_W = 297, PAGE_H = 210, COLS = 6, MARGIN = 8, GAP = 4;
+                const cellW = (PAGE_W - MARGIN * 2 - GAP * (COLS - 1)) / COLS;
+                const cellH = cellW * (4 / 3); 
+                const rowsPerPage = Math.floor((PAGE_H - MARGIN * 2 + GAP) / (cellH + GAP));
+                const totalRows = Math.ceil(n / COLS);
+                const totalPages = Math.ceil(totalRows / rowsPerPage);
+
+                const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+                const img = new Image(); img.src = dupImageDataURL;
+                await new Promise(r => { img.onload = r; });
+                const imgAspect = img.naturalWidth / img.naturalHeight;
+
+                let photoIndex = 0;
+                for (let page = 0; page < totalPages; page++) {
+                    if (page > 0) pdf.addPage('a4', 'landscape');
+                    for (let row = 0; row < rowsPerPage && photoIndex < n; row++) {
+                        for (let col = 0; col < COLS && photoIndex < n; col++) {
+                            const x = MARGIN + col * (cellW + GAP); const y = MARGIN + row * (cellH + GAP);
+                            let drawW = cellW, drawH = cellH, ox = 0, oy = 0;
+                            if (imgAspect > cellW / cellH) { drawH = cellW / imgAspect; oy = (cellH - drawH) / 2; } 
+                            else { drawW = cellH * imgAspect; ox = (cellW - drawW) / 2; }
+                            pdf.addImage(dupImageDataURL, 'JPEG', x + ox, y + oy, drawW, drawH, undefined, 'FAST');
+                            photoIndex++;
+                        }
+                    }
+                }
+                pdf.save('photos.pdf');
+                setDupStatus(`✓ PDF with ${n} photos downloaded!`, 'ok');
+            } catch (err) { setDupStatus('PDF generation failed', 'err'); }
+            dupBtnPdf.disabled = false;
+        });
+
+        dupBtnClear.addEventListener('click', () => {
+            dupImageDataURL = null; dupFileInput.value = ''; dupFileName.textContent = 'No file chosen';
+            dupCountInput.value = 6; updateDupCountInfo();
+            dupGrid.innerHTML = `<div class="empty-state"><div class="big">📷</div><div>Your duplicated photos will appear here</div></div>`;
+            dupPreviewSec.style.display = 'none'; dupBtnGen.disabled = true; dupBtnPdf.disabled = true;
+            setDupStatus('Waiting for image…', '');
+        });
+
+        function setDupStatus(msg, type) { dupStatus.textContent = msg; dupStatus.className = type || ''; }
     </script>
 </body>
 </html>
